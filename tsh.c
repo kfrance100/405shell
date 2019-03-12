@@ -48,68 +48,68 @@ void sigquit_handler(int sig);
  */
 int main(int argc, char **argv) 
 {
-    char c;
-    char cmdline[MAXLINE];
-    int emit_prompt = 1; /* emit prompt (default) */
+		char c;
+		char cmdline[MAXLINE];
+		int emit_prompt = 1; /* emit prompt (default) */
 
-    /* Redirect stderr to stdout (so that driver will get all output
-     * on the pipe connected to stdout) */
-    dup2(1, 2);
+		/* Redirect stderr to stdout (so that driver will get all output
+		 * on the pipe connected to stdout) */
+		dup2(1, 2);
 
-    /* Parse the command line */
-    while ((c = getopt(argc, argv, "hvp")) != EOF) {
-        switch (c) {
-        case 'h':             /* print help message */
-            usage();
-	    break;
-        case 'v':             /* emit additional diagnostic info */
-            verbose = 1;
-	    break;
-        case 'p':             /* don't print a prompt */
-            emit_prompt = 0;  /* handy for automatic testing */
-	    break;
-	default:
-            usage();
-	}
-    }
+		/* Parse the command line */
+		while ((c = getopt(argc, argv, "hvp")) != EOF) {
+				switch (c) {
+						case 'h':             /* print help message */
+								usage();
+								break;
+						case 'v':             /* emit additional diagnostic info */
+								verbose = 1;
+								break;
+						case 'p':             /* don't print a prompt */
+								emit_prompt = 0;  /* handy for automatic testing */
+								break;
+						default:
+								usage();
+				}
+		}
 
-    /* Install the signal handlers */
+		/* Install the signal handlers */
 
-    /* These are the ones you will need to implement */
-    Signal(SIGINT,  sigint_handler);   /* ctrl-c */
-    Signal(SIGTSTP, sigtstp_handler);  /* ctrl-z */
-    Signal(SIGCHLD, sigchld_handler);  /* Terminated or stopped child */
+		/* These are the ones you will need to implement */
+		Signal(SIGINT,  sigint_handler);   /* ctrl-c */
+		Signal(SIGTSTP, sigtstp_handler);  /* ctrl-z */
+		Signal(SIGCHLD, sigchld_handler);  /* Terminated or stopped child */
 
-    /* This one provides a clean way to kill the shell */
-    Signal(SIGQUIT, sigquit_handler); 
+		/* This one provides a clean way to kill the shell */
+		Signal(SIGQUIT, sigquit_handler); 
 
-    /* Initialize the job list */
-    initjobs(jobs);
+		/* Initialize the job list */
+		initjobs(jobs);
 
-    /* Execute the shell's read/eval loop */
-    while (1) {
+		/* Execute the shell's read/eval loop */
+		while (1) {
 
-	/* Read command line */
-	if (emit_prompt) {
-	    printf("%s", prompt);
-	    fflush(stdout);
-	}
-	if ((fgets(cmdline, MAXLINE, stdin) == NULL) && ferror(stdin))
-	    app_error("fgets error");
-	if (feof(stdin)) { /* End of file (ctrl-d) */
-	    fflush(stdout);
-	    exit(0);
-	}
+				/* Read command line */
+				if (emit_prompt) {
+						printf("%s", prompt);
+						fflush(stdout);
+				}
+				if ((fgets(cmdline, MAXLINE, stdin) == NULL) && ferror(stdin))
+						app_error("fgets error");
+				if (feof(stdin)) { /* End of file (ctrl-d) */
+						fflush(stdout);
+						exit(0);
+				}
 
-	/* Evaluate the command line */
-	eval(cmdline);
-	fflush(stdout);
-	fflush(stdout);
-    } 
+				/* Evaluate the command line */
+				eval(cmdline);
+				fflush(stdout);
+				fflush(stdout);
+		} 
 
-    exit(0); /* control never reaches here */
+		exit(0); /* control never reaches here */
 }
-  
+
 /* 
  * eval - Evaluate the command line that the user has just typed in
  * 
@@ -120,10 +120,50 @@ int main(int argc, char **argv)
  * each child process must have a unique process group ID so that our
  * background children don't receive SIGINT (SIGTSTP) from the kernel
  * when we type ctrl-c (ctrl-z) at the keyboard.  
-*/
+ */
 void eval(char *cmdline) 
 {
-    return;
+		char *arg[MAXARGS];	
+
+		pid_t pid;
+		sigset_t mask;
+		int bg = parseline(cmdline, argv);
+		if (arg[0] == NULL)
+				return;  
+		if(!builtin_cmd(arg)){
+				sigemptyset(&mask);
+				sigaddset(&mask,SIGCHLD);
+				sigprocmask(SIG_BLOCK, &mask,NULL);
+				if((pid = fork()) == 0) {
+						setpgid(0, 0);
+						sigprocmask(SIG_UNBLOCK, &mask,NULL);
+						if(execve(arg[0],arg,environ) < 0) { 
+								printf("%s: Command not found. \n",arg[0]);
+								exit(0);
+						}
+				}
+
+				if(!bg) {
+						if(addjob(jobs, pid, FG, cmdline))
+						{
+								sigprocmask(SIG_UNBLOCK,&mask,NULL);
+								waitfg(pid);
+						}
+						else{kill(-pid,SIGINT);};
+				}
+				else
+				{
+						if(addjob(jobs, pid, BG, cmdline)) 
+						{
+								sigprocmask(SIG_UNBLOCK,&mask,NULL);
+								printf("[%d] (%d) %s",pid2jid(pid),pid,cmdline);
+						}
+						else{kill(-pid,SIGINT);}; 
+
+				}
+		}
+
+		return;
 }
 
 
@@ -135,7 +175,7 @@ void eval(char *cmdline)
  */
 int builtin_cmd(char **argv) 
 {
-    return 0;     /* not a builtin command */
+		return 0;     /* not a builtin command */
 }
 
 /* 
@@ -143,7 +183,7 @@ int builtin_cmd(char **argv)
  */
 void do_bgfg(char **argv) 
 {
-    return;
+		return;
 }
 
 /* 
@@ -151,7 +191,7 @@ void do_bgfg(char **argv)
  */
 void waitfg(pid_t pid)
 {
-    return;
+		return;
 }
 
 /*****************
@@ -167,7 +207,7 @@ void waitfg(pid_t pid)
  */
 void sigchld_handler(int sig) 
 {
-    return;
+		return;
 }
 
 /* 
@@ -177,7 +217,7 @@ void sigchld_handler(int sig)
  */
 void sigint_handler(int sig) 
 {
-    return;
+		return;
 }
 
 /*
@@ -187,7 +227,7 @@ void sigint_handler(int sig)
  */
 void sigtstp_handler(int sig) 
 {
-    return;
+		return;
 }
 
 /*********************
@@ -205,11 +245,11 @@ void sigtstp_handler(int sig)
  */
 void usage(void) 
 {
-    printf("Usage: shell [-hvp]\n");
-    printf("   -h   print this message\n");
-    printf("   -v   print additional diagnostic information\n");
-    printf("   -p   do not emit a command prompt\n");
-    exit(1);
+		printf("Usage: shell [-hvp]\n");
+		printf("   -h   print this message\n");
+		printf("   -v   print additional diagnostic information\n");
+		printf("   -p   do not emit a command prompt\n");
+		exit(1);
 }
 
 /*
@@ -218,8 +258,8 @@ void usage(void)
  */
 void sigquit_handler(int sig) 
 {
-    printf("Terminating after receipt of SIGQUIT signal\n");
-    exit(1);
+		printf("Terminating after receipt of SIGQUIT signal\n");
+		exit(1);
 }
 
 
